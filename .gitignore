@@ -24,3 +24,5 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+.python-version/
