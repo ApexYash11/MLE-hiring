@@ -14,32 +14,32 @@ class SafetyEngine:
 
     _HOMOGLYPH_TRANSLATION = str.maketrans(
         {
-            "а": "a",
-            "е": "e",
-            "і": "i",
-            "о": "o",
-            "р": "p",
-            "с": "c",
-            "х": "x",
-            "Α": "a",
-            "Β": "b",
-            "Ε": "e",
-            "Η": "h",
-            "Ι": "i",
-            "Κ": "k",
-            "Μ": "m",
-            "Ν": "n",
-            "Ο": "o",
-            "Ρ": "p",
-            "Τ": "t",
-            "Χ": "x",
-            "а".upper(): "a",
-            "е".upper(): "e",
-            "і".upper(): "i",
-            "о".upper(): "o",
-            "р".upper(): "p",
-            "с".upper(): "c",
-            "х".upper(): "x",
+            "\u0430": "a",
+            "\u0435": "e",
+            "\u0456": "i",
+            "\u043e": "o",
+            "\u0440": "p",
+            "\u0441": "c",
+            "\u0445": "x",
+            "\u0391": "a",
+            "\u0392": "b",
+            "\u0395": "e",
+            "\u0397": "h",
+            "\u0399": "i",
+            "\u039a": "k",
+            "\u039c": "m",
+            "\u039d": "n",
+            "\u039f": "o",
+            "\u03a1": "p",
+            "\u03a4": "t",
+            "\u03a7": "x",
+            "\u0410": "a",
+            "\u0415": "e",
+            "\u0406": "i",
+            "\u041e": "o",
+            "\u0420": "p",
+            "\u0421": "c",
+            "\u0425": "x",
         }
     )
 
@@ -105,7 +105,7 @@ class SafetyEngine:
                     "ignora las instrucciones",
                     "ignoriere die anweisungen",
                     "ignora le istruzioni",
-                    "无视之前的指令",
+                    "\u65e0\u89c6\u4e4b\u524d\u7684\u6307\u4ee4",
                 ],
             }
         )
@@ -156,7 +156,9 @@ class SafetyEngine:
     def _normalize(self, text: str) -> str:
         text = unicodedata.normalize("NFKC", text)
         text = text.translate(self._HOMOGLYPH_TRANSLATION)
-        text = "".join(char for char in text if not unicodedata.category(char).startswith("C"))
+        text = "".join(
+            char for char in text if not unicodedata.category(char).startswith("C")
+        )
         return re.sub(r"\s+", " ", text.lower()).strip()
 
     def _match_patterns(self, normalized_text: str) -> tuple[str, str] | None:
@@ -173,7 +175,9 @@ class SafetyEngine:
         if decoded == text:
             return False, ""
 
-        found, reason = self._scan_text(decoded, source="URL-decoded content", depth=depth + 1)
+        found, reason = self._scan_text(
+            decoded, source="URL-decoded content", depth=depth + 1
+        )
         if found:
             return True, reason
         return False, ""
