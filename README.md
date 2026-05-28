@@ -32,7 +32,15 @@ Read [`problem_statement.md`](./problem_statement.md) for the full task spec, in
 ├── evalutation_criteria.md         # Scoring rubric (read carefully — hidden requirements)
 ├── README.md                       # You are here
 ├── code/                           # ← Build your agent here
-│   ├── main.py                     #   Entry point (rename/extend as you like)
+│   ├── main.py                     #   Entry point
+│   ├── agent.py                    #   LLM wrapper
+│   ├── retriever.py                #   Hybrid retrieval stack
+│   ├── safety.py                   #   Adversarial input screening
+│   ├── pii.py                      #   PII detection and redaction
+│   ├── validator.py                #   Output repair and validation
+│   ├── prompts.py                  #   Centralized prompt strings
+│   ├── README.md                   #   Setup and run instructions
+│   ├── ARCHITECTURE.md             #   Design documentation
 │   └── validate_output.py          #   Format validation (structure only, not quality)
 ├── data/                           # Local-only support corpus (no network needed)
 │   ├── devplatform/                 #   DevPlatform help center
@@ -48,7 +56,7 @@ Read [`problem_statement.md`](./problem_statement.md) for the full task spec, in
 
 ## What you need to build
 
-A terminal-based agent that, for each row in `support_tickets/support_tickets.csv`, produces a complete output row. See `sample_support_tickets.csv` and the `output.csv` header for the full column schema — make sure you generate **all** required columns, not just the ones described in the problem statement's primary output section.
+A terminal-based agent that, for each row in `support_tickets/support_tickets.csv`, produces a complete output row. See `sample_support_tickets.csv` and the `output.csv` header for the full column schema — make sure you generate **all** required columns, including the extended fields used by the repository validator.
 
 | Column | Description |
 | --- | --- |
@@ -57,6 +65,8 @@ A terminal-based agent that, for each row in `support_tickets/support_tickets.cs
 | `response` | User-facing answer grounded in the provided corpus |
 | `justification` | Concise explanation of the routing/answering decision |
 | `request_type` | `product_issue`, `feature_request`, `bug`, or `invalid` |
+
+The complete submission schema also includes `confidence_score`, `source_documents`, `risk_level`, `pii_detected`, `language`, and `actions_taken`. The repository validator checks the full header set, so your generated `output.csv` must match it exactly.
 
 Hard requirements (from `problem_statement.md`):
 
@@ -163,7 +173,7 @@ These are suggestions based on what has worked for similar challenges. Choose th
 ## Common pitfalls
 
 - **Trusting the sample set distribution.** The sample tickets are mostly straightforward FAQs. The actual test set is not.
-- **Ignoring the extended output columns.** The problem statement's primary output section lists 5 columns. The full schema has more. Check `output.csv` and `sample_support_tickets.csv`.
+- **Ignoring the extended output columns.** The problem statement's primary output section lists 5 columns, but the repository validator expects the full extended schema. Check `output.csv` and `sample_support_tickets.csv`.
 - **No adversarial handling.** A single prompt injection compliance results in a 0% score on the largest evaluation dimension (25% of total).
 - **Hallucinated citations.** Citing corpus files that don't exist is penalized more heavily than omitting citations.
 - **Over-engineering.** Building a perfect RAG system that takes 8 hours leaves no time for safety, calibration, and testing.

@@ -38,10 +38,17 @@ class TicketOutput(BaseModel):
             raise ValueError("response cannot be empty")
         return str(v).strip()
 
-    @field_validator("confidence_score")
+    @field_validator("confidence_score", mode="before")
     @classmethod
     def confidence_in_range(cls, v):
         return round(max(0.0, min(1.0, float(v))), 4)
+
+    @field_validator("actions_taken", mode="before")
+    @classmethod
+    def actions_taken_default(cls, v):
+        if v is None:
+            return []
+        return v
 
 
 class OutputValidator:

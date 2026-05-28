@@ -1,6 +1,6 @@
 """Central configuration for the support triage pipeline."""
 
-MODEL = "anthropic/claude-sonnet-4-5"
+MODEL = "deepseek/deepseek-v4-flash:free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 TEMPERATURE = 0
 SEED = 42
