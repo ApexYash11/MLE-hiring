@@ -16,6 +16,7 @@ from langdetect.lang_detect_exception import LangDetectException
 
 import config as _config
 import agent as agent_module
+from agent import AgentRunner
 from pii import PIIDetector
 from retriever import RetrievalEngine
 from safety import SafetyEngine
@@ -36,8 +37,12 @@ logger = logging.getLogger("main")
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = getattr(_config, "DATA_DIR", _BASE_DIR / "data")
-INPUT_CSV = getattr(_config, "INPUT_CSV", _BASE_DIR / "support_tickets" / "support_tickets.csv")
-OUTPUT_CSV = getattr(_config, "OUTPUT_CSV", _BASE_DIR / "support_tickets" / "output.csv")
+INPUT_CSV = getattr(
+    _config, "INPUT_CSV", _BASE_DIR / "support_tickets" / "support_tickets.csv"
+)
+OUTPUT_CSV = getattr(
+    _config, "OUTPUT_CSV", _BASE_DIR / "support_tickets" / "output.csv"
+)
 RETRIEVAL_TOP_K = getattr(_config, "RETRIEVAL_TOP_K", 5)
 SAFE_ESCALATION_CONFIDENCE = getattr(_config, "SAFE_ESCALATION_CONFIDENCE", 0.92)
 
@@ -72,14 +77,58 @@ def classify_product(ticket_row: dict) -> str:
     elif "visa" in company or "visa" in combined:
         return "visa"
 
-    if any(w in combined for w in ["api", "sdk", "webhook", "endpoint", "token", "pipeline"]):
+    if any(
+        w in combined
+        for w in ["api", "sdk", "webhook", "endpoint", "token", "pipeline"]
+    ):
         return "devplatform"
-    if any(w in combined for w in ["refund", "charge", "transaction", "card", "payment", "dispute", "billing"]):
+    if any(
+        w in combined
+        for w in [
+            "refund",
+            "charge",
+            "transaction",
+            "card",
+            "payment",
+            "dispute",
+            "billing",
+        ]
+    ):
         return "visa"
-    if any(w in combined for w in ["model", "prompt", "completion", "claude", "context", "inference", "rate limit"]):
+    if any(
+        w in combined
+        for w in [
+            "model",
+            "prompt",
+            "completion",
+            "claude",
+            "context",
+            "inference",
+            "rate limit",
+        ]
+    ):
         return "claude"
 
     return "general"
+
+
+def parse_issue_conversation(issue_json: str) -> str:
+    if not issue_json or not str(issue_json).strip():
+        return ""
+    if str(issue_json).strip() == "[]":
+        return ""
+    try:
+        turns = json.loads(str(issue_json))
+        if not isinstance(turns, list):
+            return str(issue_json)
+        lines = []
+        for turn in turns:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            lines.append(f"{role}: {content}")
+        return "\n".join(lines)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return str(issue_json)
 
 
 def detect_lang(text: str) -> str:
@@ -91,7 +140,9 @@ def detect_lang(text: str) -> str:
         return "en"
 
 
-def build_safe_row(ticket_row: dict, reason: str, pii_flag: bool, language: str) -> dict:
+def build_safe_row(
+    ticket_row: dict, reason: str, pii_flag: bool, language: str
+) -> dict:
     return {
         "issue": ticket_row.get("issue", ""),
         "subject": ticket_row.get("subject", ""),
@@ -121,18 +172,22 @@ def process_ticket(
 ) -> dict:
     ticket_id = str(row.get("ticket_id", f"row-{ticket_idx}"))
 
-    raw_text = " ".join([
-        str(row.get("subject", "")),
-        str(row.get("conversation", "")),
-        str(row.get("message", "")),
-    ]).strip()
+    raw_issue = str(row.get("issue", ""))
+    conversation_text = parse_issue_conversation(raw_issue)
+
+    raw_text = " ".join(
+        [
+            str(row.get("subject", "")),
+            conversation_text,
+        ]
+    ).strip()
 
     language = detect_lang(raw_text)
 
     pii_flag = pii_detector.detect(raw_text)
     clean_text = pii_detector.redact(raw_text)
     clean_row = dict(row)
-    clean_row["conversation"] = pii_detector.redact(str(row.get("conversation", "")))
+    clean_row["conversation"] = pii_detector.redact(conversation_text)
     clean_row["subject"] = pii_detector.redact(str(row.get("subject", "")))
 
     is_adversarial, safety_reason = safety_engine.scan(raw_text)
@@ -150,7 +205,9 @@ def process_ticket(
     product = classify_product(row)
 
     try:
-        docs = retrieval_engine.retrieve(query=clean_text, product=product, top_k=RETRIEVAL_TOP_K)
+        docs = retrieval_engine.retrieve(
+            query=clean_text, product=product, top_k=RETRIEVAL_TOP_K
+        )
         contradiction_flag = retrieval_engine.has_contradiction(docs)
     except Exception as exc:
         logger.error("[%s] Retrieval failed: %s", ticket_id, exc)
@@ -172,27 +229,29 @@ def process_ticket(
     raw_str = raw_result.get("_raw", raw_result)
     validated = validator.validate(raw_str, ticket_id)
 
-    source_docs = "|".join(d["file_path"] for d in docs if d.get("file_path", "").strip())
+    source_docs = "|".join(
+        d["file_path"] for d in docs if d.get("file_path", "").strip()
+    )
     validated["source_documents"] = source_docs
     validated["pii_detected"] = str(pii_flag).lower()
     validated["language"] = language
-    validated["actions_taken"] = json.dumps(validated.get("actions_taken", []), ensure_ascii=False)
+    validated["actions_taken"] = json.dumps(
+        validated.get("actions_taken", []), ensure_ascii=False
+    )
 
     result = {
         "issue": row.get("issue", ""),
         "subject": row.get("subject", ""),
         "company": row.get("company", ""),
     }
-    result.update({col: validated.get(col, "") for col in OUTPUT_COLUMNS if col not in result})
+    result.update(
+        {col: validated.get(col, "") for col in OUTPUT_COLUMNS if col not in result}
+    )
     return result
 
 
 def main():
     load_dotenv()
-
-    agent_module.MAX_LLM_RETRIES = 0
-    agent_module.RETRY_BACKOFF_SECONDS = 0
-    agent_module.MAX_TOKENS = min(getattr(agent_module, "MAX_TOKENS", 1000), 256)
 
     parser = argparse.ArgumentParser(description="Support triage agent pipeline")
     parser.add_argument("--input", default=str(INPUT_CSV), help="Path to input CSV")
@@ -221,13 +280,15 @@ def main():
     logger.info("All modules loaded")
 
     df = pd.read_csv(input_path)
+    df.columns = [col.lower().strip() for col in df.columns]
     total = len(df)
     logger.info("Loaded %d tickets", total)
 
     results = []
     start_time = time.time()
 
-    for idx, row in df.iterrows():
+    for idx_raw, row in df.iterrows():
+        idx = int(idx_raw)  # type: ignore[arg-type]
         ticket_id = str(row.get("ticket_id", f"row-{idx}"))
         print(f"Processing ticket {idx + 1}/{total} [{ticket_id}]...", file=sys.stderr)
         try:
@@ -249,7 +310,12 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_df.to_csv(output_path, index=False)
     elapsed = time.time() - start_time
-    logger.info("Done. %d tickets in %.1fs (%.2fs/ticket)", total, elapsed, (elapsed / total) if total else 0.0)
+    logger.info(
+        "Done. %d tickets in %.1fs (%.2fs/ticket)",
+        total,
+        elapsed,
+        (elapsed / total) if total else 0.0,
+    )
     logger.info("Output written to %s", output_path)
     print(f"\nDone. {total} tickets processed in {elapsed:.1f}s", file=sys.stderr)
     print(f"Output: {output_path}", file=sys.stderr)

@@ -16,11 +16,24 @@ env/
 *.swo
 *~
 
+# Generated output files
+output-*.csv
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Log files
+*.log
+mle_hiring/
 
 # Build artifacts
 dist/
 build/
 *.egg-info/
+
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/

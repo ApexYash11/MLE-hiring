@@ -31,17 +31,16 @@ Read [`problem_statement.md`](./problem_statement.md) for the full task spec, in
 ├── problem_statement.md            # Full task description and I/O schema
 ├── evalutation_criteria.md         # Scoring rubric (read carefully — hidden requirements)
 ├── README.md                       # You are here
-├── code/                           # ← Build your agent here
+├── ARCHITECTURE.md                 # Architecture design documentation
+├── code/                           # ← Agent implementation
 │   ├── main.py                     #   Entry point
-│   ├── agent.py                    #   LLM wrapper
-│   ├── retriever.py                #   Hybrid retrieval stack
+│   ├── agent.py                    #   LLM wrapper with multi-provider fallback
+│   ├── retriever.py                #   BM25 retrieval engine
 │   ├── safety.py                   #   Adversarial input screening
 │   ├── pii.py                      #   PII detection and redaction
-│   ├── validator.py                #   Output repair and validation
-│   ├── prompts.py                  #   Centralized prompt strings
-│   ├── README.md                   #   Setup and run instructions
-│   ├── ARCHITECTURE.md             #   Design documentation
-│   └── validate_output.py          #   Format validation (structure only, not quality)
+│   ├── validator.py                #   JSON repair and output validation
+│   ├── prompts.py                  #   Centralized prompt templates
+│   └── validate_output.py          #   CSV format validator
 ├── data/                           # Local-only support corpus (no network needed)
 │   ├── devplatform/                 #   DevPlatform help center
 │   ├── claude/                     #   Claude Help Center export
@@ -87,8 +86,6 @@ All of your work belongs in [`code/`](./code/). The repo ships with an empty `co
 
 Conventions:
 
-- Put a **README inside `code/`** describing how to install dependencies and run your agent.
-- Put an **ARCHITECTURE.md inside `code/`** documenting your agent's design (see evaluation criteria).
 - Read secrets **from environment variables only** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …). Copy `.env.example` → `.env` (already gitignored) if you keep one. **Never hardcode keys.**
 - Be **deterministic** where possible. Seed any random sampling.
 - Write responses to `support_tickets/output.csv`.
@@ -97,14 +94,47 @@ Conventions:
 
 ## Quickstart
 
-Clone this repository:
+### Prerequisites
+
+- Python 3.10+
+- `uv` package manager
+- API key for any supported provider (set in `.env` or environment)
+
+### Install
 
 ```bash
 git clone <your-repo-url>
 cd MLE-hiring
+uv sync
 ```
 
-You are free to use any language or runtime. We recommend **Python**, **JavaScript**, or **TypeScript**.
+### Run
+
+Process all support tickets and generate output:
+
+```bash
+uv run python code/main.py
+```
+
+Or specify custom paths:
+
+```bash
+uv run python code/main.py --input support_tickets/support_tickets.csv --output support_tickets/output.csv
+```
+
+### Validate
+
+Check CSV format compliance:
+
+```bash
+uv run python code/validate_output.py
+```
+
+Run the adversarial regression suite:
+
+```bash
+uv run python -m pytest tests/ -v
+```
 
 ---
 
@@ -127,7 +157,7 @@ Submit via the official Google Form: [https://forms.gle/yofAXWzgif7hnFiX6](https
 
 You will upload **four** files:
 
-1. **Code zip** — zip your `code/` directory and upload it. Include `ARCHITECTURE.md` and `README.md`. Exclude virtualenvs, `node_modules`, build artifacts, the `data/` corpus, and the `support_tickets/` CSVs.
+1. **Code zip** — zip your `code/` directory and upload it. Exclude virtualenvs, `node_modules`, build artifacts, the `data/` corpus, and the `support_tickets/` CSVs. Also include `ARCHITECTURE.md` from the repo root.
 2. **Predictions CSV** — your agent's output for `support_tickets/support_tickets.csv` (i.e. the populated `output.csv`). We will re-run your code to verify this matches.
 3. **Chat transcript** — the `log.txt` from the path in [Chat transcript logging](#chat-transcript-logging).
 4. **Git history** — run `git log --oneline --all > git_history.txt` and include it, OR include your `.git` directory in the zip.
@@ -142,7 +172,7 @@ The team will have reviewed your code and the interview has three parts:
 
 1. **Architecture deep-dive** (15 min) — explain your design decisions, trade-offs, and how you used AI tools to build your solution.
 2. **Live red-teaming** (15 min) — the interviewers will present new adversarial tickets. You will run your agent live and defend the outputs.
-3. **Self-assessment review** (15 min) — discuss your `code/ARCHITECTURE.md` self-assessment and potential failure modes.
+3. **Self-assessment review** (15 min) — discuss your `ARCHITECTURE.md` self-assessment and potential failure modes.
 
 The interview is 45 minutes long.
 

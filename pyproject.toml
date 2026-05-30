@@ -1,7 +1,7 @@
 [project]
 name = "mle-hiring"
 version = "0.1.0"
-description = "Add your description here"
+description = "MLE Hiring Challenge — AI support triage agent for DevPlatform, Claude, and Visa"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
